@@ -1,0 +1,62 @@
+version: '2.2'
+services:
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.1
+    container_name: es01
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+#      - discovery.seed_hosts=es02,es03
+#      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#   The following mean that I am allowing an unlimited amount memory to be locked by this
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - elastic
+
+  kib01:
+    image: docker.elastic.co/kibana/kibana:7.12.1
+    container_name: kib01
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_URL: http://es01:9200
+      ELASTICSEARCH_HOSTS: '["http://es01:9200"]'
+    networks:
+      - elastic
+
+volumes:
+  data01:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge
+
+
+
+#  Over the life-time of your cluster (master-eligible) nodes might get added and removed. Elasticsearch automatically
+#  manages your cluster and the master node election process, with the ultimate goal to prevent a split brain scenario
+#  from happening, meaning you eventually end up having 2 clusters which go by the same name but with independent
+#  master nodes. To prevent that from happening when starting up your cluster for the very first time (bootstrapping
+#  your cluster) Elastic requires you to configure the cluster.initial_master_nodes property with the names of the
+#  nodes that initially will serve as master-eligible nodes. This property only needs to be configured on nodes that
+#  are master-eligible and the setting will only be considered for the very first startup of your cluster. As values,
+#  you put in the names as configured with the node.name property of your master-eligible nodes.
+#
+#  The discovery.seed_hosts property supports the discovery process which is all about enabling a new node to establish
+#  communication with an already existing cluster and eventually joining it when the cluster.name matches. You are
+#  supposed to configure it with an array of host names (not node names!) on which you expect other instances of
+#  Elasticsearch belonging to the same cluster to be running. You don't need to add all 100 host names of the 100 nodes
+#  you may have in your cluster. It's sufficient to list host names of the most stable node names there. As master
+#  (eligible) nodes are supposed to be very stable nodes, Elastic recommends to put the host of all master-eligible
+#  nodes (typically 3) in there. Whenever you start/restart a node, it goes through this discovery process.
